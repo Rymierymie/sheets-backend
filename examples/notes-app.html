@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notes App - Sheets Backend Example</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --success: #3fb950;
+      --warning: #d29922;
+      --error: #f85149;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .container { max-width: 720px; margin: 0 auto; }
+
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+
+    .subtitle {
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+      font-size: 0.9rem;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .panel h2 { font-size: 1.1rem; margin-bottom: 1rem; }
+
+    .input-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 0.5rem 0.75rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+
+    input[type="text"]:focus { outline: none; border-color: var(--accent); }
+
+    button {
+      padding: 0.5rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.15s;
+    }
+
+    button:hover { border-color: var(--accent); color: var(--accent); }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #000;
+      font-weight: 600;
+    }
+
+    button.primary:hover {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+
+    .hint { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem; }
+
+    .hint code {
+      background: var(--bg);
+      padding: 0.15rem 0.35rem;
+      border-radius: 3px;
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 1.5rem;
+      font-size: 0.85rem;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .status-dot.connected { background: var(--success); }
+    .status-dot.syncing { background: var(--warning); animation: pulse 1s infinite; }
+    .status-dot.error { background: var(--error); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .status-text { flex: 1; }
+    .status-time { color: var(--text-muted); font-size: 0.8rem; }
+
+    .notes-list { list-style: none; margin-top: 1rem; }
+
+    .notes-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+
+    .notes-list li:last-child { border-bottom: none; }
+    .note-time { color: var(--text-muted); font-size: 0.75rem; }
+
+    .delete-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0.25rem;
+      font-size: 0.8rem;
+    }
+
+    .delete-btn:hover { color: var(--error); }
+
+    .empty-state {
+      color: var(--text-muted);
+      font-style: italic;
+      font-size: 0.9rem;
+      padding: 1rem 0;
+    }
+
+    .actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+
+    .share-url {
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: var(--accent);
+      word-break: break-all;
+      margin-top: 0.5rem;
+    }
+
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Notes App</h1>
+    <p class="subtitle">Example app using SheetsBackend for persistence</p>
+
+    <!-- Setup -->
+    <div class="panel" id="setupPanel">
+      <h2>Connect Your Sheet</h2>
+      <div class="input-row">
+        <input type="text" id="sheetInput" placeholder="Google Sheet URL or ID" />
+        <button class="primary" onclick="connectSheet()">Connect</button>
+      </div>
+      <p class="hint">
+        Paste a Google Sheet URL or just the ID:
+        <code>docs.google.com/spreadsheets/d/<strong>{ID}</strong>/edit</code>
+      </p>
+      <p class="share-url hidden" id="shareUrl"></p>
+    </div>
+
+    <!-- Status -->
+    <div class="status-bar hidden" id="statusBar">
+      <div class="status-dot" id="statusDot"></div>
+      <span class="status-text" id="statusText">Not connected</span>
+      <span class="status-time" id="statusTime"></span>
+    </div>
+
+    <!-- App -->
+    <div class="panel hidden" id="appPanel">
+      <h2>Notes</h2>
+      <div class="input-row">
+        <input type="text" id="noteInput" placeholder="Type a note..." onkeydown="if(event.key==='Enter') addNote()" />
+        <button onclick="addNote()">Add</button>
+      </div>
+      <ul class="notes-list" id="notesList"></ul>
+      <div class="actions">
+        <button class="primary" onclick="syncNotes()">Sync to Sheet</button>
+        <button onclick="pullNotes()">Load from Sheet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Include SheetsBackend library -->
+  <script src="../lib/sheets-backend.js"></script>
+
+  <script>
+    // --- Initialize ---
+    // Replace with your own deployed Apps Script URL (see README.md step 1)
+    const db = new SheetsBackend({
+      scriptUrl: 'YOUR_APPS_SCRIPT_URL_HERE',
+      localStorageKey: 'notes-app',
+    });
+
+    let notes = [];
+
+    // --- Event listeners ---
+    db.on('syncing', () => setStatus('syncing', 'Syncing...'));
+    db.on('synced', ({ direction }) => {
+      setStatus('connected', direction === 'push' ? 'Synced' : 'Loaded from sheet');
+    });
+    db.on('error', ({ error }) => setStatus('error', error.message));
+
+    // --- Boot ---
+    async function init() {
+      if (db.sheetId) {
+        document.getElementById('sheetInput').value = db.sheetId;
+        showApp();
+        const data = await db.load();
+        if (data && data.notes) {
+          notes = data.notes;
+        }
+        renderNotes();
+      }
+    }
+
+    // --- Connection ---
+    function connectSheet() {
+      const input = document.getElementById('sheetInput').value.trim();
+      if (!input) return setStatus('error', 'Sheet ID or URL required');
+
+      db.connect(input);
+      showApp();
+
+      document.getElementById('shareUrl').textContent = db.shareableUrl;
+      document.getElementById('shareUrl').classList.remove('hidden');
+
+      // Try loading from sheet
+      pullNotes();
+    }
+
+    function showApp() {
+      document.getElementById('statusBar').classList.remove('hidden');
+      document.getElementById('appPanel').classList.remove('hidden');
+      setStatus('connected', 'Connected');
+    }
+
+    // --- Notes ---
+    function addNote() {
+      const input = document.getElementById('noteInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      notes.push({ id: Date.now(), text, createdAt: new Date().toISOString() });
+      input.value = '';
+      db.save({ notes });
+      renderNotes();
+      setStatus('connected', 'Unsaved changes');
+    }
+
+    function deleteNote(id) {
+      notes = notes.filter(n => n.id !== id);
+      db.save({ notes });
+      renderNotes();
+      setStatus('connected', 'Unsaved changes');
+    }
+
+    async function syncNotes() {
+      try {
+        await db.sync();
+      } catch (e) {
+        // error event handles the UI
+      }
+    }
+
+    async function pullNotes() {
+      try {
+        const data = await db.pull();
+        if (data && data.notes) {
+          notes = data.notes;
+          renderNotes();
+        } else {
+          setStatus('connected', 'Sheet is empty - start adding notes');
+        }
+      } catch (e) {
+        // error event handles the UI
+      }
+    }
+
+    function renderNotes() {
+      const list = document.getElementById('notesList');
+      if (notes.length === 0) {
+        list.innerHTML = '<div class="empty-state">No notes yet. Add one above.</div>';
+        return;
+      }
+      list.innerHTML = notes.map(n => {
+        const div = document.createElement('div');
+        div.textContent = n.text;
+        const escaped = div.innerHTML;
+        return `<li>
+          <span>${escaped}</span>
+          <span>
+            <span class="note-time">${new Date(n.createdAt).toLocaleTimeString()}</span>
+            <button class="delete-btn" onclick="deleteNote(${n.id})">x</button>
+          </span>
+        </li>`;
+      }).join('');
+    }
+
+    // --- Status ---
+    function setStatus(type, message) {
+      document.getElementById('statusDot').className = 'status-dot ' + type;
+      document.getElementById('statusText').textContent = message;
+      const time = document.getElementById('statusTime');
+      time.textContent = db.lastSynced
+        ? 'Last sync: ' + new Date(db.lastSynced).toLocaleTimeString()
+        : '';
+    }
+
+    init();
+  </script>
+</body>
+</html>
